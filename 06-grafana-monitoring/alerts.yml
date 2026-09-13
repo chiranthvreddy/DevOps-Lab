@@ -1,0 +1,17 @@
+groups:
+  - name: delivery-alerts
+    rules:
+      - alert: TooManyPendingDeliveries
+        expr: delivery_pending > 10
+        for: 15s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pending deliveries exceeded 10"
+      - alert: HighAverageDeliveryTime
+        expr: delivery_latency_seconds > 30
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Delivery latency exceeded 30 seconds"
