@@ -1,0 +1,4 @@
+pipeline {
+ agent any
+ stages { stage('Hello World') { steps { sh 'bash 08-jenkins-hello-world/hello-world.sh' } } }
+}
