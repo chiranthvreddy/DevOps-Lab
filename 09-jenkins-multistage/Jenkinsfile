@@ -1,0 +1,61 @@
+pipeline {
+  agent any
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+    stage('Build') {
+      steps {
+        dir('09-jenkins-multistage') {
+          sh 'python3 -m venv .venv && .venv/bin/pip install -r requirements.txt'
+        }
+      }
+    }
+    stage('Test') {
+      steps {
+        dir('09-jenkins-multistage') {
+          sh '.venv/bin/python -m unittest -v test_app'
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        sh 'mkdir -p deployed-app'
+        sh 'cp 09-jenkins-multistage/app.py 09-jenkins-multistage/requirements.txt deployed-app/'
+      }
+    }
+    stage('Run Application') {
+      steps {
+        sh '''#!/bin/sh
+set -eu
+nohup 09-jenkins-multistage/.venv/bin/python deployed-app/app.py > deployed-app/app.log 2>&1 < /dev/null &
+echo $! > deployed-app/app.pid
+'''
+      }
+    }
+    stage('Test Application') {
+      steps {
+        sh '''#!/bin/sh
+set -eu
+09-jenkins-multistage/.venv/bin/python -c 'import time, urllib.request, sys
+for attempt in range(20):
+    try:
+        response = urllib.request.urlopen("http://127.0.0.1:5000/", timeout=2)
+        assert response.status == 200
+        print(response.read().decode())
+        sys.exit(0)
+    except Exception:
+        time.sleep(1)
+sys.exit("Application did not start")
+'
+'''
+      }
+    }
+  }
+  post {
+    always {
+      sh 'if [ -f deployed-app/app.pid ]; then kill $(cat deployed-app/app.pid) 2>/dev/null || true; fi'
+      archiveArtifacts artifacts: 'deployed-app/**', allowEmptyArchive: true
+    }
+  }
+}
